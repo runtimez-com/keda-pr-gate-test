@@ -1,0 +1,35 @@
+# What main deploys today.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: worker, namespace: shop}
+spec:
+  selector: {matchLabels: {app: worker}}
+  template:
+    metadata: {labels: {app: worker}}
+    spec: {containers: [{name: app, image: registry.k8s.io/pause:3.9, resources: {requests: {cpu: 100m, memory: 64Mi}}}]}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: worker, namespace: shop}
+spec:
+  scaleTargetRef: {name: worker}
+  minReplicaCount: 1
+  triggers:
+  - type: cron
+    metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "2"}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: legacy, namespace: shop}
+spec:
+  scaleTargetRef: {name: worker}
+  minReplicaCount: 1
+  triggers:
+  - type: cron
+    metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "1"}
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata: {name: vault-auth, namespace: shop}
+spec:
+  hashiCorpVault: {address: "http://vault.vault:8200", authentication: kubernetes, role: r, mount: kubernetes}

@@ -1,0 +1,190 @@
+# Round 3 fixtures (eac#529, action v1.0.4): one object per new KEDA rule. Cluster: rtz-eks, KEDA 2.18.1.
+# The workloads the ScaledObjects point at ship here too, so scale-target-missing stays quiet.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: rtzk-stan, namespace: rtzk}
+spec:
+  selector: {matchLabels: {app: rtzk-stan}}
+  template:
+    metadata: {labels: {app: rtzk-stan}}
+    spec: {containers: [{name: app, image: "registry.k8s.io/pause:3.9"}]}
+---
+# replicas-set-on-target: the cluster's ScaledObject rtzk-pass scales this Deployment (1 replica now) -> HIGH, "cuts it to 0"
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: rtzk-pass, namespace: rtzk-pass}
+spec:
+  replicas: 0
+  selector: {matchLabels: {app: rtzk-pass}}
+  template:
+    metadata: {labels: {app: rtzk-pass}}
+    spec: {containers: [{name: app, image: "registry.k8s.io/pause:3.9"}]}
+---
+# trigger-type-unknown: a typo
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: r3-typo, namespace: rtzk-pass}
+spec:
+  scaleTargetRef: {name: r3-typo}
+  minReplicaCount: 1
+  triggers:
+  - type: cronn
+    metadata: {timezone: UTC, start: "0 8 * * *", end: "0 18 * * *", desiredReplicas: "2"}
+---
+# trigger-type-unknown: clickhouse exists only from KEDA 2.19; the cluster runs 2.18.1
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: r3-newer, namespace: rtzk-pass}
+spec:
+  scaleTargetRef: {name: r3-newer}
+  minReplicaCount: 1
+  triggers:
+  - type: clickhouse
+    metadata: {query: "SELECT count() FROM jobs", targetValue: "10"}
+---
+# paused-replicas-invalid
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: r3-pause-bad, namespace: rtzk-pass, annotations: {autoscaling.keda.sh/paused-replicas: "two"}}
+spec:
+  scaleTargetRef: {name: r3-pause-bad}
+  minReplicaCount: 1
+  triggers:
+  - type: cron
+    metadata: {timezone: UTC, start: "0 8 * * *", end: "0 18 * * *", desiredReplicas: "2"}
+---
+# paused HIGH: paused-replicas "0" scales the workload to zero
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: r3-pause-zero, namespace: rtzk-pass, annotations: {autoscaling.keda.sh/paused-replicas: "0"}}
+spec:
+  scaleTargetRef: {name: r3-pause-zero}
+  minReplicaCount: 1
+  triggers:
+  - type: cron
+    metadata: {timezone: UTC, start: "0 8 * * *", end: "0 18 * * *", desiredReplicas: "2"}
+---
+# hpa-behavior-invalid: Kubernetes allows a stabilization window of at most 3600 s
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: r3-behavior, namespace: rtzk-pass}
+spec:
+  scaleTargetRef: {name: r3-behavior}
+  minReplicaCount: 1
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown: {stabilizationWindowSeconds: 7200, policies: [{type: Pods, value: 1, periodSeconds: 60}]}
+  triggers:
+  - type: cron
+    metadata: {timezone: UTC, start: "0 8 * * *", end: "0 18 * * *", desiredReplicas: "2"}
+---
+# scale-target-not-scalable: a DaemonSet has no /scale
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: r3-daemonset, namespace: rtzk-pass}
+spec:
+  scaleTargetRef: {kind: DaemonSet, name: r3-agent}
+  minReplicaCount: 1
+  triggers:
+  - type: cron
+    metadata: {timezone: UTC, start: "0 8 * * *", end: "0 18 * * *", desiredReplicas: "2"}
+---
+# activation-above-threshold: min 0, activation 50 > threshold 10
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: r3-activation, namespace: rtzk-pass}
+spec:
+  scaleTargetRef: {name: r3-activation}
+  triggers:
+  - type: prometheus
+    metadata: {serverAddress: "http://prometheus.monitoring:9090", query: "sum(queue_depth)", threshold: "10", activationThreshold: "50"}
+---
+# idle-replica-nonzero
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: r3-idle, namespace: rtzk-pass}
+spec:
+  scaleTargetRef: {name: r3-idle}
+  idleReplicaCount: 1
+  minReplicaCount: 2
+  triggers:
+  - type: cron
+    metadata: {timezone: UTC, start: "0 8 * * *", end: "0 18 * * *", desiredReplicas: "3"}
+---
+# scaledjob-restart-always
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata: {name: r3-job, namespace: rtzk-pass}
+spec:
+  jobTargetRef:
+    template:
+      spec:
+        restartPolicy: Always
+        containers: [{name: worker, image: "registry.k8s.io/pause:3.9"}]
+  triggers:
+  - type: cron
+    metadata: {timezone: UTC, start: "0 8 * * *", end: "0 18 * * *", desiredReplicas: "1"}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: r3-typo, namespace: rtzk-pass}
+spec:
+  selector: {matchLabels: {app: r3-typo}}
+  template:
+    metadata: {labels: {app: r3-typo}}
+    spec: {containers: [{name: app, image: "registry.k8s.io/pause:3.9"}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: r3-newer, namespace: rtzk-pass}
+spec:
+  selector: {matchLabels: {app: r3-newer}}
+  template:
+    metadata: {labels: {app: r3-newer}}
+    spec: {containers: [{name: app, image: "registry.k8s.io/pause:3.9"}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: r3-pause-bad, namespace: rtzk-pass}
+spec:
+  selector: {matchLabels: {app: r3-pause-bad}}
+  template:
+    metadata: {labels: {app: r3-pause-bad}}
+    spec: {containers: [{name: app, image: "registry.k8s.io/pause:3.9"}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: r3-pause-zero, namespace: rtzk-pass}
+spec:
+  selector: {matchLabels: {app: r3-pause-zero}}
+  template:
+    metadata: {labels: {app: r3-pause-zero}}
+    spec: {containers: [{name: app, image: "registry.k8s.io/pause:3.9"}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: r3-behavior, namespace: rtzk-pass}
+spec:
+  selector: {matchLabels: {app: r3-behavior}}
+  template:
+    metadata: {labels: {app: r3-behavior}}
+    spec: {containers: [{name: app, image: "registry.k8s.io/pause:3.9"}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: r3-activation, namespace: rtzk-pass}
+spec:
+  selector: {matchLabels: {app: r3-activation}}
+  template:
+    metadata: {labels: {app: r3-activation}}
+    spec: {containers: [{name: app, image: "registry.k8s.io/pause:3.9"}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: r3-idle, namespace: rtzk-pass}
+spec:
+  selector: {matchLabels: {app: r3-idle}}
+  template:
+    metadata: {labels: {app: r3-idle}}
+    spec: {containers: [{name: app, image: "registry.k8s.io/pause:3.9"}]}

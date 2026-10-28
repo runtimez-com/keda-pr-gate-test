@@ -1,4 +1,4 @@
-# BASE: what main has today (mirrors the cluster)
+# HEAD (round 3): rtzk-stan ScaledObject removed while KEDA holds rtzk-stan at 0 -> scaledobject-removed HIGH
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata: {name: rtzk-pass, namespace: rtzk-pass}
@@ -9,15 +9,6 @@ spec:
   triggers:
   - type: cron
     metadata: {timezone: UTC, start: "0 * * * *", end: "59 * * * *", desiredReplicas: "1"}
----
-apiVersion: keda.sh/v1alpha1
-kind: ScaledObject
-metadata: {name: rtzk-stan, namespace: rtzk}
-spec:
-  scaleTargetRef: {name: rtzk-stan}
-  triggers:
-  - type: cron
-    metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "1"}
 ---
 apiVersion: keda.sh/v1alpha1
 kind: TriggerAuthentication

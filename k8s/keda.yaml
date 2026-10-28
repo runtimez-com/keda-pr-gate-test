@@ -5,7 +5,7 @@ metadata: {name: rtzk-pass, namespace: rtzk-pass}
 spec:
   scaleTargetRef: {name: rtzk-pass}
   minReplicaCount: 1
-  maxReplicaCount: 2
+  maxReplicaCount: 3
   triggers:
   - type: cron
     metadata: {timezone: UTC, start: "0 * * * *", end: "59 * * * *", desiredReplicas: "1"}

@@ -23,7 +23,7 @@ jobs:
             git diff --name-only "origin/${{ github.base_ref }}...HEAD"
             echo '__CHANGED__'
           } >> "$GITHUB_OUTPUT"
-      - uses: runtimez-com/deployment-risk-action@v1.0.3
+      - uses: runtimez-com/deployment-risk-action@v1.0.5
         with:
           manifests: k8s
           baseline-manifests: base-src/k8s

@@ -1,4 +1,4 @@
-# What main deploys today.
+# The PR. Each object below should trip exactly the KEDA rule named in its comment.
 apiVersion: apps/v1
 kind: Deployment
 metadata: {name: worker, namespace: shop}
@@ -8,9 +8,22 @@ spec:
     metadata: {labels: {app: worker}}
     spec: {containers: [{name: app, image: registry.k8s.io/pause:3.9, resources: {requests: {cpu: 100m, memory: 64Mi}}}]}
 ---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: no-requests, namespace: shop}
+spec:
+  selector: {matchLabels: {app: no-requests}}
+  template:
+    metadata: {labels: {app: no-requests}}
+    spec: {containers: [{name: app, image: registry.k8s.io/pause:3.9}]}
+---
+# paused (diff): worker gets paused. "legacy" is gone (scaledobject-removed).
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
-metadata: {name: worker, namespace: shop}
+metadata:
+  name: worker
+  namespace: shop
+  annotations: {autoscaling.keda.sh/paused: "true"}
 spec:
   scaleTargetRef: {name: worker}
   minReplicaCount: 1
@@ -18,18 +31,208 @@ spec:
   - type: cron
     metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "2"}
 ---
+# deleted-auth-still-referenced (diff): vault-auth is deleted, this trigger still uses it
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
-metadata: {name: legacy, namespace: shop}
+metadata: {name: uses-vault, namespace: shop}
 spec:
-  scaleTargetRef: {name: worker}
+  scaleTargetRef: {name: uses-vault-app}
+  minReplicaCount: 1
+  triggers:
+  - type: prometheus
+    metadata: {serverAddress: "http://prom:9090", query: "sum(up)", threshold: "1"}
+    authenticationRef: {name: vault-auth}
+---
+# so-name-too-long (2.20+)
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: a-scaledobject-name-that-is-far-too-long-for-a-kubernetes-label-value-x, namespace: shop}
+spec:
+  scaleTargetRef: {name: a-scaledobject-name-that-is-far-too-long-for-a-kub-app}
   minReplicaCount: 1
   triggers:
   - type: cron
     metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "1"}
 ---
+# hpa-name-too-long (2.20+): keda-hpa- + 56 characters
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: hpa-name-check-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, namespace: shop}
+spec:
+  scaleTargetRef: {name: hpa-name-check-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-app}
+  minReplicaCount: 1
+  triggers:
+  - type: cron
+    metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "1"}
+---
+# replica-bounds-invalid: min above max
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: bounds, namespace: shop}
+spec:
+  scaleTargetRef: {name: bounds-app}
+  minReplicaCount: 5
+  maxReplicaCount: 2
+  triggers:
+  - type: cron
+    metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "1"}
+---
+# fallback-invalid: a fallback on cpu-only triggers
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: fallback, namespace: shop}
+spec:
+  scaleTargetRef: {name: fallback-app}
+  minReplicaCount: 1
+  fallback: {failureThreshold: 3, replicas: 2}
+  triggers:
+  - type: cpu
+    metricType: Utilization
+    metadata: {value: "60"}
+---
+# triggers-invalid: two triggers share a name
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: dup-triggers, namespace: shop}
+spec:
+  scaleTargetRef: {name: dup-triggers-app}
+  minReplicaCount: 1
+  triggers:
+  - {type: cron, name: same, metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "1"}}
+  - {type: cron, name: same, metadata: {timezone: UTC, start: "30 * * * *", end: "35 * * * *", desiredReplicas: "1"}}
+---
+# cpu-memory-only-scale-to-zero: cpu only, minReplicaCount unset
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: to-zero, namespace: shop}
+spec:
+  scaleTargetRef: {name: to-zero-app}
+  triggers:
+  - type: cpu
+    metricType: Utilization
+    metadata: {value: "60"}
+---
+# cpu-memory-request-missing: cpu trigger on a container with no cpu request
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: no-request, namespace: shop}
+spec:
+  scaleTargetRef: {name: no-requests}
+  minReplicaCount: 1
+  triggers:
+  - type: cpu
+    metricType: Utilization
+    metadata: {value: "60"}
+---
+# scaling-modifiers-invalid: a target without a formula
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: modifiers, namespace: shop}
+spec:
+  scaleTargetRef: {name: modifiers-app}
+  minReplicaCount: 1
+  advanced: {scalingModifiers: {target: "5"}}
+  triggers:
+  - {type: cron, name: c, metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "1"}}
+---
+# crd-schema-violation (2.20+ CRD): pollingInterval must be at least 1
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: schema, namespace: shop}
+spec:
+  scaleTargetRef: {name: schema-app}
+  minReplicaCount: 1
+  pollingInterval: 0
+  triggers:
+  - type: cron
+    metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "1"}
+---
+# trigger-auth-invalid: an unsupported Vault auth method fails every scaler that uses it
 apiVersion: keda.sh/v1alpha1
 kind: TriggerAuthentication
-metadata: {name: vault-auth, namespace: shop}
+metadata: {name: bad-vault, namespace: shop}
 spec:
-  hashiCorpVault: {address: "http://vault.vault:8200", authentication: kubernetes, role: r, mount: kubernetes}
+  hashiCorpVault: {address: "http://vault.vault:8200", authentication: aws}
+
+---
+# one Deployment per ScaledObject above, so each object trips only its own rule
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: uses-vault-app, namespace: shop}
+spec:
+  selector: {matchLabels: {app: uses-vault-app}}
+  template:
+    metadata: {labels: {app: uses-vault-app}}
+    spec: {containers: [{name: app, image: registry.k8s.io/pause:3.9, resources: {requests: {cpu: 100m, memory: 64Mi}}}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: a-scaledobject-name-that-is-far-too-long-for-a-kub-app, namespace: shop}
+spec:
+  selector: {matchLabels: {app: a-scaledobject-name-that-is-far-too-long-for-a-kub-app}}
+  template:
+    metadata: {labels: {app: a-scaledobject-name-that-is-far-too-long-for-a-kub-app}}
+    spec: {containers: [{name: app, image: registry.k8s.io/pause:3.9, resources: {requests: {cpu: 100m, memory: 64Mi}}}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: hpa-name-check-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-app, namespace: shop}
+spec:
+  selector: {matchLabels: {app: hpa-name-check-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-app}}
+  template:
+    metadata: {labels: {app: hpa-name-check-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-app}}
+    spec: {containers: [{name: app, image: registry.k8s.io/pause:3.9, resources: {requests: {cpu: 100m, memory: 64Mi}}}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: bounds-app, namespace: shop}
+spec:
+  selector: {matchLabels: {app: bounds-app}}
+  template:
+    metadata: {labels: {app: bounds-app}}
+    spec: {containers: [{name: app, image: registry.k8s.io/pause:3.9, resources: {requests: {cpu: 100m, memory: 64Mi}}}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: fallback-app, namespace: shop}
+spec:
+  selector: {matchLabels: {app: fallback-app}}
+  template:
+    metadata: {labels: {app: fallback-app}}
+    spec: {containers: [{name: app, image: registry.k8s.io/pause:3.9, resources: {requests: {cpu: 100m, memory: 64Mi}}}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: dup-triggers-app, namespace: shop}
+spec:
+  selector: {matchLabels: {app: dup-triggers-app}}
+  template:
+    metadata: {labels: {app: dup-triggers-app}}
+    spec: {containers: [{name: app, image: registry.k8s.io/pause:3.9, resources: {requests: {cpu: 100m, memory: 64Mi}}}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: to-zero-app, namespace: shop}
+spec:
+  selector: {matchLabels: {app: to-zero-app}}
+  template:
+    metadata: {labels: {app: to-zero-app}}
+    spec: {containers: [{name: app, image: registry.k8s.io/pause:3.9, resources: {requests: {cpu: 100m, memory: 64Mi}}}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: modifiers-app, namespace: shop}
+spec:
+  selector: {matchLabels: {app: modifiers-app}}
+  template:
+    metadata: {labels: {app: modifiers-app}}
+    spec: {containers: [{name: app, image: registry.k8s.io/pause:3.9, resources: {requests: {cpu: 100m, memory: 64Mi}}}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: schema-app, namespace: shop}
+spec:
+  selector: {matchLabels: {app: schema-app}}
+  template:
+    metadata: {labels: {app: schema-app}}
+    spec: {containers: [{name: app, image: registry.k8s.io/pause:3.9, resources: {requests: {cpu: 100m, memory: 64Mi}}}]}

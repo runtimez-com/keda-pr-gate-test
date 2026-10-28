@@ -23,11 +23,15 @@ jobs:
             git diff --name-only "origin/${{ github.base_ref }}...HEAD"
             echo '__CHANGED__'
           } >> "$GITHUB_OUTPUT"
-      # No runtimez-url / api-key / cluster-id: the manifest-only and base-vs-head checks run inside the
-      # action's container and never call runtimez. Add those four (as secrets) for the cluster checks.
       - uses: runtimez-com/deployment-risk-action@v1.0.3
         with:
           manifests: k8s
           baseline-manifests: base-src/k8s
           changed-files: ${{ steps.diff.outputs.files }}
           fail-on: HIGH
+          # Cluster context: the cluster checks read this cluster's inventory from runtimez. Keep all four in
+          # secrets: a public repo's run log prints a step's inputs.
+          runtimez-url: ${{ secrets.RUNTIMEZ_URL }}
+          api-key: ${{ secrets.RUNTIMEZ_API_KEY }}
+          org-id: ${{ secrets.RUNTIMEZ_ORG_ID }}
+          cluster-id: ${{ secrets.RUNTIMEZ_CLUSTER_ID }}

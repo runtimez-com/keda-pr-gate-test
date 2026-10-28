@@ -1,35 +1,26 @@
-# What main deploys today.
-apiVersion: apps/v1
-kind: Deployment
-metadata: {name: worker, namespace: shop}
-spec:
-  selector: {matchLabels: {app: worker}}
-  template:
-    metadata: {labels: {app: worker}}
-    spec: {containers: [{name: app, image: registry.k8s.io/pause:3.9, resources: {requests: {cpu: 100m, memory: 64Mi}}}]}
----
+# BASE: what main has today (mirrors the cluster)
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
-metadata: {name: worker, namespace: shop}
+metadata: {name: rtzk-pass, namespace: rtzk-pass}
 spec:
-  scaleTargetRef: {name: worker}
+  scaleTargetRef: {name: rtzk-pass}
   minReplicaCount: 1
+  maxReplicaCount: 2
   triggers:
   - type: cron
-    metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "2"}
+    metadata: {timezone: UTC, start: "0 * * * *", end: "59 * * * *", desiredReplicas: "1"}
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
-metadata: {name: legacy, namespace: shop}
+metadata: {name: rtzk-stan, namespace: rtzk}
 spec:
-  scaleTargetRef: {name: worker}
-  minReplicaCount: 1
+  scaleTargetRef: {name: rtzk-stan}
   triggers:
   - type: cron
     metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "1"}
 ---
 apiVersion: keda.sh/v1alpha1
 kind: TriggerAuthentication
-metadata: {name: vault-auth, namespace: shop}
+metadata: {name: rtzk-vault, namespace: rtzk}
 spec:
   hashiCorpVault: {address: "http://vault.vault:8200", authentication: kubernetes, role: r, mount: kubernetes}

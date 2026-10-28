@@ -1,26 +1,125 @@
-# BASE: what main has today (mirrors the cluster)
+# HEAD: the PR. rtzk-pass SO deleted (scaledobject-removed), rtzk-vault TA deleted while the cluster's
+# rtzk-vault SO uses it (deleted-auth-still-referenced), rtzk-stan paused (paused).
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
-metadata: {name: rtzk-pass, namespace: rtzk-pass}
-spec:
-  scaleTargetRef: {name: rtzk-pass}
-  minReplicaCount: 1
-  maxReplicaCount: 2
-  triggers:
-  - type: cron
-    metadata: {timezone: UTC, start: "0 * * * *", end: "59 * * * *", desiredReplicas: "1"}
----
-apiVersion: keda.sh/v1alpha1
-kind: ScaledObject
-metadata: {name: rtzk-stan, namespace: rtzk}
+metadata:
+  name: rtzk-stan
+  namespace: rtzk
+  annotations: {autoscaling.keda.sh/paused: "true"}
 spec:
   scaleTargetRef: {name: rtzk-stan}
   triggers:
   - type: cron
     metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "1"}
 ---
+# target-has-other-scaledobject: the cluster's SO rtzk-pass already scales rtzk-pass
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: pr-second, namespace: rtzk-pass}
+spec:
+  scaleTargetRef: {name: rtzk-pass}
+  minReplicaCount: 1
+  triggers:
+  - type: cron
+    metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "1"}
+---
+# hpa-name-taken: keda-hpa-rtzk-pass belongs to the cluster's SO rtzk-pass
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: pr-web, namespace: rtzk-pass}
+spec:
+  selector: {matchLabels: {app: pr-web}}
+  template:
+    metadata: {labels: {app: pr-web}}
+    spec: {containers: [{name: app, image: registry.k8s.io/pause:3.9}]}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: pr-taken, namespace: rtzk-pass}
+spec:
+  scaleTargetRef: {name: pr-web}
+  minReplicaCount: 1
+  advanced: {horizontalPodAutoscalerConfig: {name: keda-hpa-rtzk-pass}}
+  triggers:
+  - type: cron
+    metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "1"}
+---
+# scale-target-missing: no such Deployment in the PR or the cluster
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: pr-ghost, namespace: rtzk-pass}
+spec:
+  scaleTargetRef: {name: does-not-exist}
+  minReplicaCount: 1
+  triggers:
+  - type: cron
+    metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "1"}
+---
+# auth-ref-missing: no TriggerAuthentication no-such-auth anywhere
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: pr-auth, namespace: rtzk-pass}
+spec:
+  selector: {matchLabels: {app: pr-auth}}
+  template:
+    metadata: {labels: {app: pr-auth}}
+    spec: {containers: [{name: app, image: registry.k8s.io/pause:3.9}]}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: pr-auth, namespace: rtzk-pass}
+spec:
+  scaleTargetRef: {name: pr-auth}
+  minReplicaCount: 1
+  triggers:
+  - type: prometheus
+    metadata: {serverAddress: "http://prom:9090", query: "sum(up)", threshold: "1"}
+    authenticationRef: {name: no-such-auth}
+---
+# target-has-other-hpa: istiod already has a plain HPA
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: pr-istiod, namespace: istio-system}
+spec:
+  scaleTargetRef: {name: istiod-upstream-1-29-3}
+  minReplicaCount: 1
+  triggers:
+  - type: cron
+    metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "1"}
+---
+# max-below-current: gate-web runs 2 replicas
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: pr-cap, namespace: rtz-gate-demo}
+spec:
+  scaleTargetRef: {name: gate-web}
+  minReplicaCount: 1
+  maxReplicaCount: 1
+  triggers:
+  - type: cron
+    metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "1"}
+---
+# version gating on KEDA 2.18.1: a 64-char name (2.20+ check) and a namespaced-TA filePath (2.19+) must stay SILENT
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: pr-name-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, namespace: rtzk-pass}
+spec:
+  scaleTargetRef: {name: pr-long}
+  minReplicaCount: 1
+  triggers:
+  - type: cron
+    metadata: {timezone: UTC, start: "0 * * * *", end: "5 * * * *", desiredReplicas: "1"}
+---
 apiVersion: keda.sh/v1alpha1
 kind: TriggerAuthentication
-metadata: {name: rtzk-vault, namespace: rtzk}
+metadata: {name: pr-file, namespace: rtzk-pass}
+spec: {filePath: "creds/token"}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: pr-long, namespace: rtzk-pass}
 spec:
-  hashiCorpVault: {address: "http://vault.vault:8200", authentication: kubernetes, role: r, mount: kubernetes}
+  selector: {matchLabels: {app: pr-long}}
+  template:
+    metadata: {labels: {app: pr-long}}
+    spec: {containers: [{name: app, image: registry.k8s.io/pause:3.9}]}

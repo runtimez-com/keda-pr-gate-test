@@ -5,6 +5,7 @@ metadata:
   namespace: rtzlbc
   annotations:
     alb.ingress.kubernetes.io/actions.ssl-redirect: "{\"type\": \"redirect\"}"
+    alb.ingress.kubernetes.io/actions.unused: "{\"type\": \"bogus\"}"
 spec:
   ingressClassName: alb
   rules:

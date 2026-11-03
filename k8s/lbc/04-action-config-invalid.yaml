@@ -1,0 +1,14 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pr4
+  namespace: rtzlbc
+  annotations: 
+    alb.ingress.kubernetes.io/actions.ssl-redirect: "{\"type\": \"redirect\"}"
+spec:
+  ingressClassName: alb
+  rules:
+  - http:
+      paths:
+      - {path: /, pathType: Prefix, backend: {service: {name: web, port: {number: 80}}}}
+---

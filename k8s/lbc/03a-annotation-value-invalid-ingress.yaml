@@ -1,0 +1,14 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pr3
+  namespace: rtzlbc
+  annotations: 
+    alb.ingress.kubernetes.io/backend-protocol-version: "HTTP3"
+spec:
+  ingressClassName: alb
+  rules:
+  - http:
+      paths:
+      - {path: /, pathType: Prefix, backend: {service: {name: web, port: {number: 80}}}}
+---

@@ -1,0 +1,13 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pr5
+  namespace: rtzlbc
+  annotations: {}
+spec:
+  ingressClassName: alb
+  rules:
+  - http:
+      paths:
+      - {path: /, pathType: Prefix, backend: {service: {name: ssl-redirect, port: {name: use-annotation}}}}
+---

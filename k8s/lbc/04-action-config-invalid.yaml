@@ -3,12 +3,12 @@ kind: Ingress
 metadata:
   name: pr4
   namespace: rtzlbc
-  annotations: 
+  annotations:
     alb.ingress.kubernetes.io/actions.ssl-redirect: "{\"type\": \"redirect\"}"
 spec:
   ingressClassName: alb
   rules:
   - http:
       paths:
-      - {path: /, pathType: Prefix, backend: {service: {name: web, port: {number: 80}}}}
+      - {path: /, pathType: Prefix, backend: {service: {name: ssl-redirect, port: {name: use-annotation}}}}
 ---

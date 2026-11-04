@@ -1,0 +1,5 @@
+apiVersion: elbv2.k8s.aws/v1beta1
+kind: IngressClassParams
+metadata: {name: pr8}
+spec: {subnets: {ids: [subnet-0aaa], tags: {kubernetes.io/role/internal-elb: ['1']}}}
+---

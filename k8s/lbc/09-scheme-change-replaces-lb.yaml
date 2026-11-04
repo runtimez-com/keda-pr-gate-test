@@ -5,7 +5,7 @@ metadata:
   namespace: rtzlbc
   annotations: 
     alb.ingress.kubernetes.io/group.name: "rtzlbc-ok"
-    alb.ingress.kubernetes.io/scheme: "internal"
+    alb.ingress.kubernetes.io/scheme: "internet-facing"
     alb.ingress.kubernetes.io/target-type: "ip"
 spec:
   ingressClassName: alb

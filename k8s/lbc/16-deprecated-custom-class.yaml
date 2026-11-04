@@ -1,0 +1,29 @@
+# 16 wrs-addon-awslbc-deprecated-annotation (LOW) on a custom --load-balancer-class (eac#577): positive = a LoadBalancer
+# Service under class rtz.example/custom carrying the deprecated internal + cross-zone keys; near-miss = the same class with
+# only aws-load-balancer-scheme — must stay silent.
+apiVersion: v1
+kind: Service
+metadata:
+  name: dep16-custom
+  namespace: rtzlbc
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+spec:
+  type: LoadBalancer
+  loadBalancerClass: rtz.example/custom
+  selector: {app: okapp}
+  ports: [{port: 80, targetPort: 80}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dep16-custom-clean
+  namespace: rtzlbc
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+spec:
+  type: LoadBalancer
+  loadBalancerClass: rtz.example/custom
+  selector: {app: okapp}
+  ports: [{port: 80, targetPort: 80}]

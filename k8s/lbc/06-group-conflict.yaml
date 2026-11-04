@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pr6a
+  namespace: rtzlbc
+  annotations: 
+    alb.ingress.kubernetes.io/group.name: "rtzpr-g"
+    alb.ingress.kubernetes.io/scheme: "internal"
+spec:
+  ingressClassName: alb
+  rules:
+  - http:
+      paths:
+      - {path: /, pathType: Prefix, backend: {service: {name: web, port: {number: 80}}}}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pr6b
+  namespace: rtzlbc
+  annotations: 
+    alb.ingress.kubernetes.io/group.name: "rtzpr-g"
+    alb.ingress.kubernetes.io/scheme: "internet-facing"
+spec:
+  ingressClassName: alb
+  rules:
+  - http:
+      paths:
+      - {path: /, pathType: Prefix, backend: {service: {name: web, port: {number: 80}}}}
+---

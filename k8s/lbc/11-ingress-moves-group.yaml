@@ -4,7 +4,7 @@ metadata:
   name: ctl11
   namespace: rtzlbc
   annotations: 
-    alb.ingress.kubernetes.io/group.name: "rtzlbc-ok"
+    alb.ingress.kubernetes.io/group.name: "rtzlbc-ok2"
     alb.ingress.kubernetes.io/scheme: "internal"
     alb.ingress.kubernetes.io/target-type: "ip"
 spec:

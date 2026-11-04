@@ -1,5 +1,5 @@
 apiVersion: elbv2.k8s.aws/v1beta1
 kind: TargetGroupBinding
 metadata: {name: tgb12, namespace: rtzlbc}
-spec: {serviceRef: {name: nosuch, port: 80}, targetGroupARN: 'arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/rtzlbc-tgb/0123456789abcdef', targetType: ip}
+spec: {serviceRef: {name: nosuch, port: 80}, targetGroupARN: 'arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/rtzlbc-tgb/0123456789abcdef', targetType: instance}
 ---
